@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MacSweep</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232B59E0'/%3E%3Cpath d='M9 11h14M13 11V8h6v3M11 11l1 13h8l1-13' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#ECEFF2; --surface:#FFFFFF; --sunk:#F5F7F9; --ink:#16202A; --mute:#5E6B78; --faint:#8C97A3;
+  --line:#DCE1E6; --accent:#2B59E0; --accent-soft:#E6ECFC; --danger:#C8323C; --ok:#118A62; --ok-soft:#E1F3EC;
+  --warn:#9A6400; --warn-soft:#FBF0D9; --free:#DCE1E6; --used:#A7B1BC;
+  --shadow:0 1px 0 rgba(22,32,42,.04),0 8px 24px -12px rgba(22,32,42,.18);
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#101419; --surface:#181E25; --sunk:#141A20; --ink:#E7ECF1; --mute:#93A0AD; --faint:#6A7682;
+  --line:#28313A; --accent:#6D8FFF; --accent-soft:#1E2A4A; --danger:#FF6B70; --ok:#3CCB97; --ok-soft:#173329;
+  --warn:#F2B84B; --warn-soft:#3A2E14; --free:#252D36; --used:#4B5663;
+  --shadow:0 1px 0 rgba(0,0,0,.3),0 8px 24px -12px rgba(0,0,0,.6);
+}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font:14px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;-webkit-font-smoothing:antialiased;padding-bottom:96px}
+button{font:inherit;color:inherit;cursor:pointer;border-radius:9px;border:1px solid var(--line);background:var(--surface);padding:8px 14px}
+button:hover{border-color:var(--faint)}
+button:disabled{opacity:.45;cursor:default}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button.primary:hover{filter:brightness(1.07)}
+button.danger{color:var(--danger)}
+button.xl{font-size:16px;padding:14px 26px;border-radius:12px}
+button.icon{padding:5px;border:0;background:none;border-radius:7px;color:var(--mute);display:inline-grid;place-items:center}
+button.icon:hover{background:var(--sunk);color:var(--ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input[type=checkbox]{width:16px;height:16px;margin:0;accent-color:var(--accent);cursor:pointer;flex:none}
+.num{font-variant-numeric:tabular-nums}
+.mute{color:var(--mute)}
+svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+.top{display:flex;align-items:center;gap:12px;padding:18px 0 4px}
+.brand{font-weight:700;font-size:15px;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
+.brand i{width:22px;height:22px;border-radius:7px;background:var(--accent);display:grid;place-items:center;color:#fff}
+.brand i svg{width:13px;height:13px;stroke-width:2.2}
+.top .spacer{flex:1}
+
+/* the disk: the one element everything revolves around */
+.hero{padding:28px 0 22px}
+.hero-row{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:18px}
+.big{font:700 52px/1 -apple-system,"SF Pro Display",system-ui,sans-serif;letter-spacing:-.035em;font-variant-numeric:tabular-nums}
+.big small{font-size:22px;letter-spacing:-.01em;font-weight:600;color:var(--mute);margin-left:8px}
+.sub{margin:8px 0 0;color:var(--mute);font-size:15px;max-width:62ch}
+.strip{display:flex;height:44px;border-radius:11px;overflow:hidden;background:var(--free);gap:2px}
+.strip > div{height:100%;min-width:0;transition:width .5s cubic-bezier(.2,.7,.2,1),opacity .3s}
+.strip .used{background:var(--used)}
+.strip .seg.off{opacity:.28}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:12px;font-size:13px;color:var(--mute)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend b{font-weight:600;color:var(--ink)}
+.sw{width:10px;height:10px;border-radius:3px;flex:none}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
+.risk{display:inline-block;font-size:11.5px;font-weight:600;padding:1px 7px;border-radius:99px;white-space:nowrap}
+.risk.safe{background:var(--ok-soft);color:var(--ok)}
+.risk.review{background:var(--warn-soft);color:var(--warn)}
+
+/* idle */
+#idleView{padding:22px 24px 8px}
+#idleView h2{margin:0 0 2px;font-size:17px;letter-spacing:-.01em}
+#idleView > p{margin:0 0 14px;color:var(--mute)}
+.checks{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:0 28px}
+.checks li{display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--line);align-items:flex-start}
+.checks li .sw{margin-top:5px}
+.checks li div{flex:1}
+.checks li b{font-weight:600}
+.checks li p{margin:1px 0 0;color:var(--mute);font-size:13px}
+
+/* scanning */
+#scanView{padding:24px}
+.scan-head{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.pct{font:700 34px/1 -apple-system,"SF Pro Display",system-ui;letter-spacing:-.03em;font-variant-numeric:tabular-nums;min-width:3.2ch}
+.scan-head .meta{flex:1;min-width:200px}
+.scan-head .meta b{display:block;font-size:15px}
+.bar{height:8px;border-radius:99px;background:var(--sunk);margin:18px 0 10px;overflow:hidden;border:1px solid var(--line)}
+.bar div{height:100%;width:0;background:var(--accent);border-radius:99px;transition:width .3s linear}
+.now{font:12px/1.4 ui-monospace,"SF Mono",Menlo,monospace;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:17px}
+.steps{list-style:none;margin:18px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:0 28px}
+.steps li{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.steps li .t{flex:1}
+.steps li.wait{color:var(--faint)}
+.steps li.skip{color:var(--faint)}
+.st{width:18px;height:18px;border-radius:50%;flex:none;display:grid;place-items:center}
+.wait .st{border:1.5px solid var(--line)}
+.run .st{border:2px solid var(--accent-soft);border-top-color:var(--accent);animation:spin .8s linear infinite}
+.done .st{background:var(--ok);color:#fff}
+.stopped .st,.skip .st{background:var(--line);color:var(--mute)}
+.st svg{width:11px;height:11px;stroke-width:2.6}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* results */
+.notice{padding:12px 16px;border-radius:12px;background:var(--accent-soft);margin-bottom:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.notice p{margin:0;flex:1;min-width:240px}
+.notice details{width:100%;font-size:13px;color:var(--mute)}
+.notice details div{font:12px ui-monospace,Menlo,monospace;margin-top:4px;word-break:break-all}
+.split{display:grid;grid-template-columns:300px 1fr;overflow:hidden}
+aside{border-right:1px solid var(--line);padding:8px;background:var(--sunk)}
+.cat{display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;cursor:pointer;user-select:none}
+.cat:hover{background:var(--surface)}
+.cat.active{background:var(--surface);box-shadow:inset 0 0 0 1px var(--line)}
+.cat .t{flex:1;min-width:0}
+.cat .t b{display:block;font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cat .t small{color:var(--mute);font-size:12px}
+.cat .s{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cat.empty{opacity:.5}
+aside hr{border:0;border-top:1px solid var(--line);margin:8px 4px}
+.main{min-width:0;display:flex;flex-direction:column}
+.mhead{padding:18px 20px 14px;border-bottom:1px solid var(--line)}
+.mhead h2{margin:0;font-size:19px;letter-spacing:-.015em;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.mhead p{margin:3px 0 12px;color:var(--mute)}
+.tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.tools input[type=search]{flex:1;min-width:180px;font:inherit;color:inherit;background:var(--sunk);border:1px solid var(--line);border-radius:9px;padding:7px 11px}
+.thead,.row{display:grid;grid-template-columns:28px minmax(0,1fr) 110px 90px 64px;align-items:center;gap:10px;padding:0 20px}
+.thead{font-size:12px;color:var(--mute);border-bottom:1px solid var(--line);height:34px}
+.thead button{border:0;background:none;padding:0;color:inherit;font-size:12px;text-align:left}
+.thead button.on{color:var(--ink);font-weight:600}
+.thead .r{text-align:right}
+.rows{max-height:calc(100vh - 330px);min-height:240px;overflow:auto}
+.row{min-height:52px;border-bottom:1px solid var(--line)}
+.row:hover{background:var(--sunk)}
+.row .n{display:flex;align-items:center;gap:10px;min-width:0}
+.row .n svg{color:var(--faint);width:18px;height:18px}
+.row .n div{min-width:0}
+.row .n b{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .n small{display:block;color:var(--faint);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .d{color:var(--mute);font-size:13px}
+.row .z{font-weight:600;text-align:right}
+.row .a{display:flex;justify-content:flex-end;gap:2px}
+.blank{padding:48px 20px;text-align:center;color:var(--mute)}
+
+footer{position:fixed;left:0;right:0;bottom:0;background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line)}
+footer .wrap{display:flex;align-items:center;gap:12px;height:72px}
+footer .sum{flex:1}
+footer .sum b{font-size:17px;letter-spacing:-.01em}
+
+dialog{border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--ink);padding:24px;width:min(440px,calc(100vw - 32px));box-shadow:0 30px 80px -20px rgba(0,0,0,.45)}
+dialog::backdrop{background:rgba(16,20,25,.45)}
+dialog h3{margin:0 0 8px;font-size:17px}
+dialog p{margin:0 0 20px;color:var(--mute)}
+.dlg-actions{display:flex;justify-content:flex-end;gap:10px}
+#toast{position:fixed;left:50%;bottom:92px;transform:translate(-50%,20px);opacity:0;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:13.5px;transition:.25s;pointer-events:none;max-width:calc(100vw - 32px)}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+[hidden]{display:none!important}
+
+@media (max-width:760px){
+  .split{grid-template-columns:1fr}
+  aside{border-right:0;border-bottom:1px solid var(--line)}
+  .thead,.row{grid-template-columns:28px minmax(0,1fr) 80px 64px}
+  .thead .dcol,.row .d{display:none}
+  .big{font-size:40px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation-duration:2s!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><i><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></i>MacSweep</div>
+    <div class="spacer"></div>
+    <button id="rescanBtn" hidden>Scan again</button>
+  </header>
+
+  <section class="hero">
+    <div class="hero-row">
+      <div>
+        <div class="big" id="big">…</div>
+        <p class="sub" id="sub"></p>
+      </div>
+      <button class="primary xl" id="scanBtn" hidden>Scan my Mac</button>
+    </div>
+    <div class="strip" id="strip" role="img" aria-label="Disk usage"></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <section class="panel" id="idleView" hidden>
+    <h2>What MacSweep checks</h2>
+    <p>Safe items are preselected. Items marked Review first are your own data, so nothing there is selected until you choose it.</p>
+    <ul class="checks" id="checks"></ul>
+  </section>
+
+  <section class="panel" id="scanView" hidden>
+    <div class="scan-head">
+      <div class="pct" id="pct">0%</div>
+      <div class="meta"><b id="stepName">Getting ready…</b><span class="mute" id="eta"></span></div>
+      <button class="danger" id="stopBtn">Stop scan</button>
+    </div>
+    <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="bar"><div id="barFill"></div></div>
+    <div class="now" id="now"></div>
+    <ol class="steps" id="steps"></ol>
+  </section>
+
+  <section id="resView" hidden>
+    <div class="notice" id="notice" hidden></div>
+    <div class="panel split">
+      <aside id="side"></aside>
+      <div class="main" id="main"></div>
+    </div>
+  </section>
+</div>
+
+<footer id="foot" hidden>
+  <div class="wrap">
+    <div class="sum"><b class="num" id="selSize">0 MB</b> <span class="mute" id="selCount">selected</span></div>
+    <button id="trashBtn">Empty Trash</button>
+    <button class="primary" id="cleanBtn" disabled>Move to Trash</button>
+  </div>
+</footer>
+
+<dialog id="dlg"><form method="dialog">
+  <h3 id="dlgTitle"></h3><p id="dlgText"></p>
+  <div class="dlg-actions"><button value="cancel">Cancel</button><button value="ok" class="primary" id="dlgOk">OK</button></div>
+</form></dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const T = "__TOKEN__";
+const COLORS = ["#2B59E0","#0E9F8E","#E2A21B","#8A63F2","#E0517F","#2AA6DE","#7FA324","#E87A2E","#9B7A60"];
+const RISK = {safe: "Safe", review: "Review first"};
+const ICON = {
+  folder: '<svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+  file: '<svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>',
+  finder: '<svg viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3M19 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6"/></svg>',
+  lock: '<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+  check: '<svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>',
+  dash: '<svg viewBox="0 0 24 24"><path d="M7 12h10"/></svg>',
+};
+
+const $ = s => document.querySelector(s);
+const nf1 = new Intl.NumberFormat("en-US", {maximumFractionDigits: 1});
+const nf0 = new Intl.NumberFormat("en-US", {maximumFractionDigits: 0});
+function fmt(b) { // base 1000, like Finder
+  const u = ["bytes","KB","MB","GB","TB"]; let i = 0;
+  while (b >= 1000 && i < 4) { b /= 1000; i++; }
+  return (i >= 3 ? nf1 : nf0).format(b) + " " + u[i];
+}
+function bigFmt(b) { const [n, u] = fmt(b).split(" "); return `${n}<small>${u}`; }
+const short = p => S.home && p.startsWith(S.home) ? "~" + p.slice(S.home.length) : p;
+const parent = p => short(p.slice(0, p.lastIndexOf("/")) || "/");
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const date = t => t ? new Date(t * 1000).toLocaleDateString("en-US", {day: "numeric", month: "short", year: "numeric"}) : "";
+const plural = (n, w) => `${nf0.format(n)} ${w}${n === 1 ? "" : "s"}`;
+const badge = r => `<span class="risk ${r}">${RISK[r]}</span>`;
+
+async function api(action, extra = {}) {
+  const r = await fetch("/api", {method: "POST", headers: {"X-Token": T, "Content-Type": "application/json"},
+                                 body: JSON.stringify({action, ...extra})});
+  if (!r.ok) throw new Error("MacSweep stopped responding. Start it again from the terminal or MacSweep.command.");
+  return r.json();
+}
+
+let S = {view: "idle", disk: null, meta: [], scan: null, cats: [], prot: [], active: 0, sel: new Set(), sort: "size", q: "", pollT: null};
+
+/* ---------- views ---------- */
+function setView(v) {
+  S.view = v;
+  $("#scanBtn").hidden = v !== "idle";
+  $("#idleView").hidden = v !== "idle";
+  $("#scanView").hidden = v !== "scan";
+  $("#resView").hidden = v !== "results";
+  $("#foot").hidden = v !== "results";
+  $("#rescanBtn").hidden = v !== "results";
+  if (v !== "scan") document.title = "MacSweep";
+  renderHero();
+}
+
+function catTotals() {
+  // while scanning: what was found; afterwards: what is selected
+  if (S.view === "scan" && S.scan) return S.scan.cats.map(c => ({found: c.size, sel: c.size}));
+  return S.cats.map(c => ({found: c.items.reduce((a, i) => a + i.size, 0),
+                           sel: c.items.reduce((a, i) => a + (S.sel.has(i.path) ? i.size : 0), 0)}));
+}
+
+function renderHero() {
+  const d = S.disk; if (!d) return;
+  const tots = catTotals();
+  const found = tots.reduce((a, t) => a + t.found, 0);
+  const sel = tots.reduce((a, t) => a + t.sel, 0);
+  if (S.view === "idle") {
+    $("#big").innerHTML = bigFmt(d.free) + ` free</small>`;
+    $("#sub").textContent = `of ${fmt(d.total)}. Scan to see what can go. Nothing is removed until you choose it, and everything goes to the Trash first.`;
+  } else if (S.view === "scan") {
+    $("#big").innerHTML = bigFmt(found) + ` found</small>`;
+    $("#sub").textContent = `Scanning. ${fmt(d.free)} free of ${fmt(d.total)} right now.`;
+  } else {
+    $("#big").innerHTML = bigFmt(sel) + ` to free</small>`;
+    $("#sub").textContent = `${fmt(found)} found in total. ${fmt(d.free)} free of ${fmt(d.total)} right now.`;
+  }
+  const pct = b => (b / d.total * 100) + "%";
+  const names = S.view === "scan" && S.scan ? S.scan.cats : S.cats;
+  let html = "", leg = "";
+  tots.forEach((t, i) => {
+    if (!t.found) return;
+    const off = S.view === "results" && !t.sel;
+    const w = S.view === "results" ? (t.sel || t.found) : t.found;
+    html += `<div class="seg${off ? " off" : ""}" style="width:${pct(w)};background:${COLORS[i]}" title="${esc(names[i].title)}: ${fmt(t.found)}"></div>`;
+    leg += `<span${off ? ' style="opacity:.5"' : ""}><i class="sw" style="background:${COLORS[i]}"></i>${esc(names[i].title)} <b class="num">${fmt(S.view === "results" && t.sel ? t.sel : t.found)}</b></span>`;
+  });
+  html += `<div class="used" style="width:${pct(Math.max(0, d.used - found))}"></div>`;
+  $("#strip").innerHTML = html;
+  $("#legend").innerHTML = leg + `<span><i class="sw" style="background:var(--used)"></i>Everything else</span><span><i class="sw" style="background:var(--free);box-shadow:inset 0 0 0 1px var(--line)"></i>Free <b class="num">${fmt(d.free)}</b></span>`;
+}
+
+function renderIdle() {
+  $("#checks").innerHTML = S.meta.map((c, i) => `
+    <li><i class="sw" style="background:${COLORS[i]}"></i><div><b>${esc(c.title)}</b> ${badge(c.risk)}<p>${esc(c.hint)}</p></div></li>`).join("");
+}
+
+/* ---------- scan ---------- */
+async function startScan() {
+  $("#notice").hidden = true;
+  await api("start_scan");
+  S.scan = await api("status");
+  setView("scan");
+  poll();
+}
+
+async function poll() {
+  clearTimeout(S.pollT);
+  try { S.scan = await api("status"); } catch (e) { toast(e.message); return; }
+  renderScan();
+  if (S.scan.phase === "scanning") S.pollT = setTimeout(poll, 250);
+  else loadResults();
+}
+
+function dur(s) { s = Math.round(s); return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`; }
+
+function renderScan() {
+  const st = S.scan, p = Math.floor(st.progress * 100);
+  $("#pct").textContent = p + "%";
+  document.title = `${p}% · MacSweep`;
+  $("#barFill").style.width = (st.progress * 100) + "%";
+  $("#bar").setAttribute("aria-valuenow", p);
+  const cur = st.cats[st.step];
+  const todo = st.cats.filter(c => c.status !== "skip" || st.phase !== "scanning");
+  $("#stepName").textContent = cur ? `Step ${todo.indexOf(cur) + 1} of ${todo.length}: ${cur.title}` : "Getting ready…";
+  let eta = `${dur(st.elapsed)} elapsed`;
+  if (st.progress > 0.08) eta += `, about ${dur(st.elapsed * (1 - st.progress) / st.progress)} left`;
+  $("#eta").textContent = eta;
+  $("#now").textContent = st.path ? `${st.verb} ${short(st.path)}` : "";
+  $("#steps").innerHTML = st.cats.map(c => `
+    <li class="${c.status}">
+      <span class="st">${c.status === "done" ? ICON.check : (c.status === "stopped" || c.status === "skip") ? ICON.dash : ""}</span>
+      <span class="t">${esc(c.title)}</span>
+      <span class="num mute">${c.status === "wait" ? "" : c.status === "skip" ? "skipped" : c.count ? fmt(c.size) : "nothing"}</span>
+    </li>`).join("");
+  renderHero();
+}
+
+async function stopScan() {
+  $("#stopBtn").disabled = true;
+  $("#stepName").textContent = "Stopping…";
+  await api("cancel");
+}
+
+async function loadResults() {
+  const r = await api("results");
+  $("#stopBtn").disabled = false;
+  S.cats = r.cats; S.prot = r.protected; S.disk = r.disk;
+  S.sel = new Set(S.cats.flatMap(c => c.selected ? c.items.map(i => i.path) : []));
+  const first = S.cats.findIndex(c => c.items.length && c.selected);
+  S.active = first >= 0 ? first : Math.max(0, S.cats.findIndex(c => c.items.length));
+  if (r.phase === "cancelled") {
+    notice(`Scan stopped at ${Math.floor((S.scan?.progress || 0) * 100)}%. These results are partial.`,
+           `<button class="primary" onclick="startScan()">Scan again</button>`);
+  }
+  setView("results");
+  renderResults();
+}
+
+/* ---------- results ---------- */
+function renderResults() { renderSide(); renderMain(); renderFoot(); renderHero(); }
+
+function renderSide() {
+  const tots = catTotals();
+  $("#side").innerHTML = S.cats.map((c, i) => {
+    const n = c.items.length, k = c.items.filter(x => S.sel.has(x.path)).length;
+    const skipped = S.scan?.cats[i]?.status === "skip";
+    return `<div class="cat${i === S.active ? " active" : ""}${n ? "" : " empty"}" data-cat="${i}" tabindex="0">
+      <input type="checkbox" data-catbox="${i}" ${n && k === n ? "checked" : ""} ${n ? "" : "disabled"} aria-label="Select all in ${esc(c.title)}">
+      <i class="sw" style="background:${COLORS[i]}"></i>
+      <span class="t"><b>${esc(c.title)}</b><small>${n ? `${k} of ${plural(n, "item")} selected` : skipped ? "Not scanned" : "Nothing to clean"}</small></span>
+      <span class="s">${n ? fmt(tots[i].found) : ""}</span></div>`;
+  }).join("") + `<hr><div class="cat${S.active === -1 ? " active" : ""}" data-cat="-1" tabindex="0">
+      <span style="width:16px;display:grid;place-items:center;color:var(--mute)">${ICON.lock}</span>
+      <span class="t"><b>Protected items</b><small>${S.prot.length ? plural(S.prot.length, "item") + " never offered" : "None yet"}</small></span></div>`;
+  document.querySelectorAll("[data-catbox]").forEach(b => {
+    const c = S.cats[+b.dataset.catbox], k = c.items.filter(x => S.sel.has(x.path)).length;
+    b.indeterminate = k > 0 && k < c.items.length;
+  });
+}
+
+function renderMain() {
+  if (S.active === -1) {
+    $("#main").innerHTML = `<div class="mhead"><h2>Protected items</h2><p>MacSweep never offers these again, in this app or through the MCP server.</p></div>
+      <div class="rows">${S.prot.length ? S.prot.map((p, i) => `
+        <div class="row" style="grid-template-columns:minmax(0,1fr) auto">
+          <div class="n">${ICON.lock}<div><b>${esc(p.split("/").pop())}</b><small>${esc(parent(p))}</small></div></div>
+          <div class="a"><button data-unprotect="${i}">Stop protecting</button></div></div>`).join("")
+        : `<div class="blank">Click the lock next to any item to keep it forever.</div>`}</div>`;
+    return;
+  }
+  const c = S.cats[S.active];
+  $("#main").innerHTML = `<div class="mhead"><h2>${esc(c.title)} ${badge(c.risk)}</h2><p>${esc(c.hint)}</p>
+      <div class="tools"><input type="search" id="q" placeholder="Filter by name or folder" value="${esc(S.q)}" aria-label="Filter items">
+      <button id="selAll">Select all</button><button id="selNone">Select none</button></div></div>
+    <div class="thead"><span></span>
+      <button data-sort="name" class="${S.sort === "name" ? "on" : ""}">Name</button>
+      <button data-sort="mtime" class="dcol ${S.sort === "mtime" ? "on" : ""}">Modified</button>
+      <button data-sort="size" class="r ${S.sort === "size" ? "on" : ""}">Size</button><span></span></div>
+    <div class="rows" id="rows"></div>`;
+  renderRows();
+}
+
+function visibleItems() {
+  const q = S.q.trim().toLowerCase();
+  const by = {size: (a, b) => b.size - a.size, mtime: (a, b) => a.mtime - b.mtime, name: (a, b) => a.name.localeCompare(b.name)}[S.sort];
+  return S.cats[S.active].items.filter(i => !q || i.path.toLowerCase().includes(q)).sort(by);
+}
+
+function renderRows() {
+  const items = visibleItems();
+  $("#rows").innerHTML = items.length ? items.map(i => `
+    <div class="row">
+      <input type="checkbox" data-item="${esc(i.path)}" ${S.sel.has(i.path) ? "checked" : ""} aria-label="Select ${esc(i.name)}">
+      <div class="n">${i.dir ? ICON.folder : ICON.file}<div><b title="${esc(i.name)}">${esc(i.name)}</b><small title="${esc(short(i.path))}">${esc(parent(i.path))}</small></div></div>
+      <div class="d">${date(i.mtime)}</div>
+      <div class="z num">${fmt(i.size)}</div>
+      <div class="a"><button class="icon" data-reveal="${esc(i.path)}" title="Show in Finder" aria-label="Show in Finder">${ICON.finder}</button>
+        <button class="icon" data-protect="${esc(i.path)}" title="Always keep" aria-label="Always keep">${ICON.lock}</button></div>
+    </div>`).join("")
+    : `<div class="blank">${S.q ? "No items match this filter." : "Nothing to clean here."}</div>`;
+}
+
+function renderFoot() {
+  let size = 0, n = 0;
+  S.cats.forEach(c => c.items.forEach(i => { if (S.sel.has(i.path)) { size += i.size; n++; } }));
+  $("#selSize").textContent = fmt(size);
+  $("#selCount").textContent = n ? `selected in ${plural(n, "item")}` : "nothing selected";
+  $("#cleanBtn").disabled = !n;
+}
+
+function refreshSelection() { renderSide(); renderFoot(); renderHero(); }
+
+/* ---------- actions ---------- */
+function ask(title, text, ok, danger) {
+  $("#dlgTitle").textContent = title; $("#dlgText").textContent = text;
+  $("#dlgOk").textContent = ok;
+  $("#dlgOk").style.background = danger ? "var(--danger)" : ""; $("#dlgOk").style.borderColor = danger ? "var(--danger)" : "";
+  const d = $("#dlg"); d.returnValue = ""; d.showModal();
+  return new Promise(res => d.addEventListener("close", () => res(d.returnValue === "ok"), {once: true}));
+}
+
+let toastT;
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 3200); }
+
+function notice(html, actions = "", details = "") {
+  const n = $("#notice"); n.hidden = false;
+  n.innerHTML = `<p>${html}</p>${actions}${details}`;
+}
+
+async function moveToTrash() {
+  const paths = [...S.sel]; let size = 0;
+  S.cats.forEach(c => c.items.forEach(i => { if (S.sel.has(i.path)) size += i.size; }));
+  if (!await ask(`Move ${plural(paths.length, "item")} to the Trash?`,
+                 `${fmt(size)} will go to the Trash. You can still restore anything until you empty it.`,
+                 "Move to Trash")) return;
+  $("#cleanBtn").disabled = true; $("#cleanBtn").textContent = "Moving…";
+  const r = await api("trash", {paths});
+  $("#cleanBtn").textContent = "Move to Trash";
+  const moved = new Set(r.moved);
+  S.cats.forEach(c => c.items = c.items.filter(i => !moved.has(i.path)));
+  moved.forEach(p => S.sel.delete(p));
+  S.disk = r.disk;
+  const errs = r.errors.length ? `<details><summary>${plural(r.errors.length, "item")} not moved (in use or locked by macOS)</summary>${r.errors.map(e => `<div>${esc(short(e.path))}: ${esc(e.reason)}</div>`).join("")}</details>` : "";
+  notice(`<b>${fmt(r.freed)} moved to the Trash.</b> Empty the Trash to get the space back.`,
+         `<button class="primary" onclick="emptyTrash()">Empty Trash</button>`, errs);
+  renderResults();
+}
+
+async function emptyTrash() {
+  if (!await ask("Empty the Trash?", "Everything in the Trash will be deleted for good, including items you put there yourself. This can't be undone.", "Empty Trash", true)) return;
+  const before = S.disk?.free || 0;
+  const r = await api("empty_trash");
+  S.disk = r.disk;
+  if (r.ok) {
+    $("#notice").hidden = true;
+    toast(`Trash emptied. ${fmt(Math.max(0, r.disk.free - before))} freed on disk.`);
+  } else {
+    toast("Couldn't empty the Trash. Allow your terminal to control Finder in System Settings > Privacy & Security > Automation.");
+  }
+  renderHero();
+}
+
+async function protectItem(path) {
+  S.prot = (await api("protect", {path})).protected;
+  S.cats.forEach(c => c.items = c.items.filter(i => i.path !== path));
+  S.sel.delete(path);
+  toast(`${path.split("/").pop()} is protected and won't be offered again.`);
+  renderResults();
+}
+
+async function unprotectItem(i) {
+  const path = S.prot[i];
+  S.prot = (await api("unprotect", {path})).protected;
+  toast(`${path.split("/").pop()} is no longer protected. It will show up in the next scan.`);
+  renderResults();
+}
+
+/* ---------- events ---------- */
+$("#scanBtn").onclick = startScan;
+$("#rescanBtn").onclick = startScan;
+$("#stopBtn").onclick = stopScan;
+$("#cleanBtn").onclick = moveToTrash;
+$("#trashBtn").onclick = emptyTrash;
+
+$("#side").addEventListener("click", e => {
+  const box = e.target.closest("[data-catbox]");
+  if (box) {
+    S.cats[+box.dataset.catbox].items.forEach(i => box.checked ? S.sel.add(i.path) : S.sel.delete(i.path));
+    if (+box.dataset.catbox === S.active) renderRows();
+    return refreshSelection();
+  }
+  const cat = e.target.closest("[data-cat]");
+  if (cat) { S.active = +cat.dataset.cat; S.q = ""; renderSide(); renderMain(); }
+});
+$("#side").addEventListener("keydown", e => {
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-cat]")) { e.preventDefault(); e.target.click(); }
+});
+
+$("#main").addEventListener("click", e => {
+  const t = e.target.closest("button,input"); if (!t) return;
+  if (t.dataset.item !== undefined) { t.checked ? S.sel.add(t.dataset.item) : S.sel.delete(t.dataset.item); return refreshSelection(); }
+  if (t.dataset.sort) { S.sort = t.dataset.sort; return renderMain(); }
+  if (t.dataset.reveal) return api("reveal", {path: t.dataset.reveal});
+  if (t.dataset.protect) return protectItem(t.dataset.protect);
+  if (t.dataset.unprotect !== undefined) return unprotectItem(+t.dataset.unprotect);
+  if (t.id === "selAll" || t.id === "selNone") {
+    visibleItems().forEach(i => t.id === "selAll" ? S.sel.add(i.path) : S.sel.delete(i.path));
+    renderRows(); refreshSelection();
+  }
+});
+$("#main").addEventListener("input", e => { if (e.target.id === "q") { S.q = e.target.value; renderRows(); } });
+
+/* ---------- start ---------- */
+(async () => {
+  const r = await api("init");
+  S.disk = r.disk; S.meta = r.categories; S.scan = r.status; S.home = r.home;
+  renderIdle();
+  if (r.status.phase === "scanning") { setView("scan"); poll(); }
+  else if (r.status.phase === "done" || r.status.phase === "cancelled") loadResults();
+  else setView("idle");
+})();
+</script>
+</body>
+</html>
